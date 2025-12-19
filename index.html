@@ -3,195 +3,81 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR A-Frame + MindAR — Gnome demo</title>
+  <title>AR A-Frame + MindAR — Практическая</title>
 
-  <!-- A-Frame (ОБЯЗАТЕЛЬНО ПЕРВЫМ) -->
+  <!-- A-Frame CDN -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
 
-  <!-- MindAR для A-Frame -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
-
+  <!-- MindAR A-Frame компонент (image tracking) -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body { margin:0; font-family: Arial, sans-serif; background:#111; color:#eee;}
-    #ui { position: fixed; left: 8px; top: 8px; z-index: 5; display:flex; gap:8px; }
-    button { padding:8px 12px; border-radius:8px; border:none; background:#2b2b2b; color:#fff; }
-    #hint { position: fixed; left: 8px; bottom: 12px; z-index:5; background:rgba(0,0,0,0.5); padding:6px 8px; border-radius:6px;}
+    body{margin:0;font-family:sans-serif}
+    #ui{position:fixed;left:10px;top:10px;z-index:10}
+    .btn{padding:8px;border-radius:6px;margin:4px}
+    .hint{position:fixed;left:10px;bottom:10px;background:rgba(0,0,0,0.6);color:#fff;padding:8px;border-radius:6px}
   </style>
 </head>
 <body>
-  <div id="ui">
-    <button id="btn-switch">Сменить модель</button>
-    <button id="btn-scale-up">Увеличить</button>
-    <button id="btn-scale-down">Уменьшить</button>
-    <button id="btn-reset">Сброс</button>
-  </div>
-  <div id="hint">Наведите камеру на маркер; один палец — поворот, перетаскивание; два пальца — масштаб.</div>
 
-  <!-- A-Frame + MindAR сцена -->
-  <a-scene
-    mindar-image="imageTargetSrc: targets.mind; maxTrack: 1;"
-    vr-mode-ui="enabled: false"
-    embedded
-    renderer="colorManagement: true, physicallyCorrectLights: true"
-    gesture-handler
-  >
-    <!-- Preload assets -->
-    <a-assets>
-      <a-asset-item id="model-gnome" src="gnome.glb"></a-asset-item>
-      <a-asset-item id="model-keg" src="keg.glb"></a-asset-item>
-      <audio id="ping" src="ping.mp3"></audio>
-    </a-assets>
+<div id="ui">
+  <button class="btn" id="scaleUp">+</button>
+  <button class="btn" id="scaleDown">−</button>
+  <button class="btn" id="next">Next</button>
+</div>
+<div class="hint" id="hint">Наведите камеру на маркер</div>
 
-    <!-- mindar camera (внутри mindar-image) -->
-    <a-entity mindar-image-target="targetIndex: 0" id="target-root">
-      <!-- контейнер, который будем манипулировать -->
-      <a-entity id="model-root" position="0 0 0">
-        <a-gltf-model id="active-model" src="#model-gnome" rotation="0 0 0" scale="0.05 0.05 0.05"
-                      animation="property: rotation; to: 0 360 0; dur: 10000; easing: linear; loop: true; enabled: false">
-        </a-gltf-model>
-      </a-entity>
+<a-scene mindar-image="imageTargetSrc: targets.mind; maxTrack:1;" 
+         embedded
+         vr-mode-ui="enabled: false"
+         renderer="colorManagement: true; physicallyCorrectLights: true">
+
+  <a-assets>
+    <a-asset-item id="m1" src="models/gnome.glb"></a-asset-item>
+    <a-asset-item id="m2" src="models/keg.glb"></a-asset-item>
+    <audio id="ping" src="sounds/ping.mp3"></audio>
+  </a-assets>
+
+  <a-entity light="type: ambient; intensity: 0.8"></a-entity>
+  <a-entity light="type: directional; intensity: 0.6" position="0 1 1"></a-entity>
+
+  <!-- MindAR root: все, что внутри — привязано к маркеру -->
+  <a-entity mindar-image-target="targetIndex: 0">
+    <a-entity id="model"
+              gltf-model="#m1"
+              position="0 0 0"
+              rotation="0 0 0"
+              scale="0.05 0.05 0.05"
+              class="interactable">
     </a-entity>
+  </a-entity>
 
-    <!-- Light -->
-    <a-entity light="type: directional; intensity: 0.9" position="0 1 0"></a-entity>
-    <a-entity light="type: ambient; intensity: 0.6"></a-entity>
+  <!-- камера для взаимодействия -->
+  <a-entity camera>
+    <a-entity cursor="rayOrigin: mouse" raycaster="objects: .interactable"></a-entity>
+  </a-entity>
 
-    <!-- camera for A-Frame (MindAR управляет камерой) -->
-    <a-entity camera></a-entity>
-  </a-scene>
+</a-scene>
 
-  <script>
-  // -- Простейшая логика управления моделями и звуком --
-  (function(){
-    const sceneEl = document.querySelector('a-scene');
-    const mindarEl = sceneEl; // mindar элемент — сам <a-scene> использует mindar-image
-    const targetRoot = document.getElementById('target-root');
-    const modelRoot = document.getElementById('model-root');
-    const activeModel = document.getElementById('active-model');
-    const audio = document.getElementById('ping');
+<script>
+  // Простейшая логика кнопок
+  const model = document.getElementById('model');
+  const assets = ['#m1','#m2']; let idx = 0;
+  document.getElementById('scaleUp').onclick = ()=> changeScale(1.2);
+  document.getElementById('scaleDown').onclick = ()=> changeScale(1/1.2);
+  document.getElementById('next').onclick = ()=>{
+    idx = (idx+1)%assets.length; model.setAttribute('gltf-model', assets[idx]);
+  };
+  function changeScale(f){
+    const s = model.getAttribute('scale');
+    model.setAttribute('scale', `${s.x*f} ${s.y*f} ${s.z*f}`);
+  }
 
-    // Список моделей для переключения
-    const models = ['#model-gnome', '#model-keg'];
-    let modelIndex = 0;
+  // события MindAR (targetFound/targetLost) — на элементе mindar-image-target
+  const root = document.querySelector('[mindar-image-target]');
+  root.addEventListener('targetFound', ()=> document.getElementById('hint').textContent='Маркер найден');
+  root.addEventListener('targetLost', ()=> document.getElementById('hint').textContent='Наведите камеру на маркер');
+</script>
 
-    // Кнопки UI
-    document.getElementById('btn-switch').addEventListener('click', ()=> {
-      modelIndex = (modelIndex + 1) % models.length;
-      activeModel.setAttribute('src', models[modelIndex]);
-      showHint(`Модель: ${models[modelIndex]}`);
-    });
-    document.getElementById('btn-scale-up').addEventListener('click', ()=> changeScale(1.2));
-    document.getElementById('btn-scale-down').addEventListener('click', ()=> changeScale(1/1.2));
-    document.getElementById('btn-reset').addEventListener('click', ()=> {
-      modelRoot.setAttribute('position', '0 0 0');
-      modelRoot.setAttribute('rotation', '0 0 0');
-      modelRoot.setAttribute('scale', '0.05 0.05 0.05');
-      showHint('Сброшено');
-    });
-
-    function changeScale(factor){
-      const s = modelRoot.getAttribute('scale');
-      const newScale = { x: s.x * factor, y: s.y * factor, z: s.z * factor };
-      modelRoot.setAttribute('scale', `${newScale.x} ${newScale.y} ${newScale.z}`);
-    }
-
-    // play sound safely (учёт политики автозапуска)
-    function tryPlaySound(){
-      if(!audio) return;
-      audio.currentTime = 0;
-      audio.play().catch(err=>{
-        // мобильные браузеры часто требуют взаимодействия — не критично, просто логируем
-        console.warn('audio play blocked; user interaction required', err);
-      });
-    }
-
-    // Обработчики событий обнаружения/потери маркера
-    // MindAR эмитит события targetFound / targetLost на элементе mindar-image-target
-    targetRoot.addEventListener('targetFound', () => {
-      // включить модель и звук
-      activeModel.setAttribute('visible', 'true');
-      // короткий звук как фидбек
-      tryPlaySound();
-    });
-    targetRoot.addEventListener('targetLost', () => {
-      // можно скрыть модель или приостановить анимации
-      activeModel.setAttribute('visible', 'false');
-    });
-
-    // По умолчанию модель может быть невидимой до обнаружения
-    activeModel.setAttribute('visible', 'false');
-
-    // --- Минимальная реализация жестов: drag (1 палец) = rotate/translate по экрану, pinch (2 пальца) = scale ---
-    let ongoing = { touches: [], lastDist: null, lastTouch: null };
-
-    function getDistance(t0, t1){
-      const dx = t0.clientX - t1.clientX;
-      const dy = t0.clientY - t1.clientY;
-      return Math.hypot(dx, dy);
-    }
-    function getMidpoint(t0, t1){
-      return { x: (t0.clientX + t1.clientX)/2, y: (t0.clientY + t1.clientY)/2 };
-    }
-
-    // Listeners на document (работает и в AR)
-    document.addEventListener('touchstart', (e)=>{
-      ongoing.touches = Array.from(e.touches);
-      if (ongoing.touches.length === 1){
-        ongoing.lastTouch = ongoing.touches[0];
-      } else if (ongoing.touches.length === 2){
-        ongoing.lastDist = getDistance(ongoing.touches[0], ongoing.touches[1]);
-      }
-    }, {passive:true});
-
-    document.addEventListener('touchmove', (e)=>{
-      const touches = Array.from(e.touches);
-      if (touches.length === 1 && ongoing.lastTouch){
-        // single-finger: вращение вокруг Y по dx и небольшая vertical translate по dy
-        const dx = touches[0].clientX - ongoing.lastTouch.clientX;
-        const dy = touches[0].clientY - ongoing.lastTouch.clientY;
-        // rotation Y
-        const rot = modelRoot.getAttribute('rotation');
-        const newY = rot.y - dx * 0.2; // чувствительность
-        modelRoot.setAttribute('rotation', `${rot.x} ${newY} ${rot.z}`);
-        // небольшой смещение по X/Z для ощущения drag'а
-        const pos = modelRoot.getAttribute('position');
-        const newX = pos.x + dx * 0.0008;
-        const newYpos = pos.y - dy * 0.0008;
-        modelRoot.setAttribute('position', `${newX} ${newYpos} ${pos.z}`);
-        ongoing.lastTouch = touches[0];
-      } else if (touches.length === 2){
-        // pinch: масштабирование относительно начального расстояния
-        const dist = getDistance(touches[0], touches[1]);
-        if (ongoing.lastDist){
-          const factor = dist / ongoing.lastDist;
-          changeScale(factor);
-          ongoing.lastDist = dist;
-        } else {
-          ongoing.lastDist = dist;
-        }
-      }
-    }, {passive:true});
-
-    document.addEventListener('touchend', (e)=>{
-      if (e.touches.length === 0){
-        ongoing.lastDist = null;
-        ongoing.lastTouch = null;
-      } else {
-        ongoing.touches = Array.from(e.touches);
-      }
-    }, {passive:true});
-
-    // Simple helper для подсказок
-    function showHint(text){
-      const el = document.getElementById('hint');
-      el.textContent = text;
-      setTimeout(()=> el.textContent = 'Наведите камеру на маркер; один палец — поворот, перетаскивание; два пальца — масштаб.', 2500);
-    }
-
-    // Примечание: для отладки в десктопе можно временно включать видимость:
-    // activeModel.setAttribute('visible','true');
-  })();
-  </script>
 </body>
 </html>

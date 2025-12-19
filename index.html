@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR A-Frame + MindAR Demo</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR A-Frame + MindAR</title>
 
   <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
@@ -12,12 +12,23 @@
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
       margin: 0;
+      overflow: hidden;
       background: #000;
       font-family: Arial, sans-serif;
-      color: #fff;
     }
+
+    a-scene {
+      position: fixed !important;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
     #ui {
       position: fixed;
       top: 10px;
@@ -26,6 +37,7 @@
       display: flex;
       gap: 8px;
     }
+
     button {
       padding: 8px 12px;
       border-radius: 6px;
@@ -33,6 +45,7 @@
       background: #222;
       color: #fff;
     }
+
     #hint {
       position: fixed;
       bottom: 12px;
@@ -49,15 +62,15 @@
 <body>
 
 <div id="ui">
-  <button id="btn-switch">Сменить модель</button>
-  <button id="btn-plus">+</button>
-  <button id="btn-minus">−</button>
+  <button id="switch">Сменить модель</button>
+  <button id="plus">+</button>
+  <button id="minus">−</button>
 </div>
 
 <div id="hint">Наведи камеру на маркер</div>
 
 <a-scene
-  mindar-image="imageTargetSrc: targets.mind;"
+  mindar-image="imageTargetSrc: targets.mind; maxTrack: 1"
   embedded
   vr-mode-ui="enabled: false"
   renderer="colorManagement: true"
@@ -71,14 +84,19 @@
 
   <!-- ЯКОРЬ МАРКЕРА -->
   <a-entity id="marker" mindar-image-target="targetIndex: 0">
+
+    <!-- ДЛЯ ОТЛАДКИ: КРАСНЫЙ КУБ (МОЖНО УБРАТЬ ПОТОМ) -->
+    <!-- <a-box color="red" scale="0.2 0.2 0.2"></a-box> -->
+
     <a-gltf-model
       id="model"
       src="#gnome"
-      position="0 0 0"
-      rotation="0 0 0"
-      scale="0.05 0.05 0.05"
+      position="0 0 0.05"
+      rotation="0 180 0"
+      scale="0.2 0.2 0.2"
       visible="false">
     </a-gltf-model>
+
   </a-entity>
 
   <!-- СВЕТ -->
@@ -99,13 +117,13 @@
   const models = ['#gnome', '#keg'];
   let index = 0;
 
-  document.getElementById('btn-switch').onclick = () => {
+  document.getElementById('switch').onclick = () => {
     index = (index + 1) % models.length;
     model.setAttribute('src', models[index]);
   };
 
-  document.getElementById('btn-plus').onclick = () => scale(1.2);
-  document.getElementById('btn-minus').onclick = () => scale(0.8);
+  document.getElementById('plus').onclick = () => scale(1.2);
+  document.getElementById('minus').onclick = () => scale(0.8);
 
   function scale(f) {
     const s = model.getAttribute('scale');
@@ -115,11 +133,15 @@
   marker.addEventListener('targetFound', () => {
     model.setAttribute('visible', true);
     sound.currentTime = 0;
-    sound.play().catch(()=>{});
+    sound.play().catch(() => {});
   });
 
   marker.addEventListener('targetLost', () => {
     model.setAttribute('visible', false);
+  });
+
+  model.addEventListener('model-loaded', () => {
+    console.log('Model loaded');
   });
 })();
 </script>

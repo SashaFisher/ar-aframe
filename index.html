@@ -2,83 +2,127 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR A-Frame + MindAR — Практическая</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR A-Frame + MindAR Demo</title>
 
-  <!-- A-Frame CDN -->
+  <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
 
-  <!-- MindAR A-Frame компонент (image tracking) -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+  <!-- MindAR -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body{margin:0;font-family:sans-serif}
-    #ui{position:fixed;left:10px;top:10px;z-index:10}
-    .btn{padding:8px;border-radius:6px;margin:4px}
-    .hint{position:fixed;left:10px;bottom:10px;background:rgba(0,0,0,0.6);color:#fff;padding:8px;border-radius:6px}
+    body {
+      margin: 0;
+      background: #000;
+      font-family: Arial, sans-serif;
+      color: #fff;
+    }
+    #ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      background: #222;
+      color: #fff;
+    }
+    #hint {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      padding: 6px 10px;
+      border-radius: 6px;
+      z-index: 10;
+    }
   </style>
 </head>
+
 <body>
 
 <div id="ui">
-  <button class="btn" id="scaleUp">+</button>
-  <button class="btn" id="scaleDown">−</button>
-  <button class="btn" id="next">Next</button>
+  <button id="btn-switch">Сменить модель</button>
+  <button id="btn-plus">+</button>
+  <button id="btn-minus">−</button>
 </div>
-<div class="hint" id="hint">Наведите камеру на маркер</div>
 
-<a-scene mindar-image="imageTargetSrc: targets.mind; maxTrack:1;" 
-         embedded
-         vr-mode-ui="enabled: false"
-         renderer="colorManagement: true; physicallyCorrectLights: true">
+<div id="hint">Наведи камеру на маркер</div>
+
+<a-scene
+  mindar-image="imageTargetSrc: targets.mind;"
+  embedded
+  vr-mode-ui="enabled: false"
+  renderer="colorManagement: true"
+>
 
   <a-assets>
-    <a-asset-item id="m1" src="gnome.glb"></a-asset-item>
-    <a-asset-item id="m2" src="keg.glb"></a-asset-item>
+    <a-asset-item id="gnome" src="gnome.glb"></a-asset-item>
+    <a-asset-item id="keg" src="keg.glb"></a-asset-item>
     <audio id="ping" src="ping.mp3"></audio>
   </a-assets>
 
-  <a-entity light="type: ambient; intensity: 0.8"></a-entity>
-  <a-entity light="type: directional; intensity: 0.6" position="0 1 1"></a-entity>
-
-  <!-- MindAR root: все, что внутри — привязано к маркеру -->
-  <a-entity mindar-image-target="targetIndex: 0">
-    <a-entity id="model"
-              gltf-model="#m1"
-              position="0 0 0"
-              rotation="0 0 0"
-              scale="0.05 0.05 0.05"
-              class="interactable">
-    </a-entity>
+  <!-- ЯКОРЬ МАРКЕРА -->
+  <a-entity id="marker" mindar-image-target="targetIndex: 0">
+    <a-gltf-model
+      id="model"
+      src="#gnome"
+      position="0 0 0"
+      rotation="0 0 0"
+      scale="0.05 0.05 0.05"
+      visible="false">
+    </a-gltf-model>
   </a-entity>
 
-  <!-- камера для взаимодействия -->
-  <a-entity camera>
-    <a-entity cursor="rayOrigin: mouse" raycaster="objects: .interactable"></a-entity>
-  </a-entity>
+  <!-- СВЕТ -->
+  <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+  <a-entity light="type: directional; intensity: 0.8" position="0 1 0"></a-entity>
+
+  <!-- КАМЕРА -->
+  <a-camera mindar-image-camera></a-camera>
 
 </a-scene>
 
 <script>
-  // Простейшая логика кнопок
+(() => {
   const model = document.getElementById('model');
-  const assets = ['#m1','#m2']; let idx = 0;
-  document.getElementById('scaleUp').onclick = ()=> changeScale(1.2);
-  document.getElementById('scaleDown').onclick = ()=> changeScale(1/1.2);
-  document.getElementById('next').onclick = ()=>{
-    idx = (idx+1)%assets.length; model.setAttribute('gltf-model', assets[idx]);
+  const marker = document.getElementById('marker');
+  const sound = document.getElementById('ping');
+
+  const models = ['#gnome', '#keg'];
+  let index = 0;
+
+  document.getElementById('btn-switch').onclick = () => {
+    index = (index + 1) % models.length;
+    model.setAttribute('src', models[index]);
   };
-  function changeScale(f){
+
+  document.getElementById('btn-plus').onclick = () => scale(1.2);
+  document.getElementById('btn-minus').onclick = () => scale(0.8);
+
+  function scale(f) {
     const s = model.getAttribute('scale');
-    model.setAttribute('scale', `${s.x*f} ${s.y*f} ${s.z*f}`);
+    model.setAttribute('scale', `${s.x * f} ${s.y * f} ${s.z * f}`);
   }
 
-  // события MindAR (targetFound/targetLost) — на элементе mindar-image-target
-  const root = document.querySelector('[mindar-image-target]');
-  root.addEventListener('targetFound', ()=> document.getElementById('hint').textContent='Маркер найден');
-  root.addEventListener('targetLost', ()=> document.getElementById('hint').textContent='Наведите камеру на маркер');
+  marker.addEventListener('targetFound', () => {
+    model.setAttribute('visible', true);
+    sound.currentTime = 0;
+    sound.play().catch(()=>{});
+  });
+
+  marker.addEventListener('targetLost', () => {
+    model.setAttribute('visible', false);
+  });
+})();
 </script>
 
 </body>
 </html>
-

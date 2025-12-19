@@ -2,52 +2,50 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR A-Frame + MindAR Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>AR A-Frame + MindAR</title>
 
-  <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-
-  <!-- MindAR -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body {
-      margin: 0;
-      background: #000;
-      font-family: Arial, sans-serif;
-      color: #fff;
-    }
+    body { margin: 0; overflow: hidden; }
+    /* UI должен быть поверх всего и иметь высокий z-index */
     #ui {
       position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 10;
+      top: 20px;
+      left: 20px;
+      z-index: 9999;
       display: flex;
-      gap: 8px;
+      gap: 10px;
     }
     button {
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: none;
-      background: #222;
-      color: #fff;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
     }
     #hint {
       position: fixed;
-      bottom: 12px;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.6);
-      padding: 6px 10px;
-      border-radius: 6px;
-      z-index: 10;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      z-index: 9999;
+      pointer-events: none;
     }
   </style>
 </head>
 
 <body>
 
+<!-- ВАЖНО: Проверьте, что ID кнопок совпадают со скриптом ниже -->
 <div id="ui">
   <button id="btn-switch">Сменить модель</button>
   <button id="btn-plus">+</button>
@@ -56,72 +54,87 @@
 
 <div id="hint">Наведи камеру на маркер</div>
 
-<a-scene
-  mindar-image="imageTargetSrc: targets.mind;"
-  embedded
-  vr-mode-ui="enabled: false"
-  renderer="colorManagement: true"
->
+<!-- Убрали embedded, добавили uiLoading/uiScanning: no чтобы не мешались -->
+<a-scene 
+  mindar-image="imageTargetSrc: targets.mind; uiLoading: no; uiScanning: no;" 
+  vr-mode-ui="enabled: false" 
+  device-orientation-permission-ui="enabled: false"
+  renderer="colorManagement: true">
 
   <a-assets>
-    <a-asset-item id="gnome" src="gnome.glb"></a-asset-item>
-    <a-asset-item id="keg" src="keg.glb"></a-asset-item>
-    <audio id="ping" src="ping.mp3"></audio>
+    <a-asset-item id="gnome-glb" src="gnome.glb"></a-asset-item>
+    <a-asset-item id="keg-glb" src="keg.glb"></a-asset-item>
+    <audio id="ping" src="ping.mp3" preload="auto"></audio>
   </a-assets>
 
-  <!-- ЯКОРЬ МАРКЕРА -->
+  <a-camera mindar-image-camera look-controls="enabled: false"></a-camera>
+
   <a-entity id="marker" mindar-image-target="targetIndex: 0">
-    <a-gltf-model
-      id="model"
-      src="#gnome"
-      position="0 0 0"
-      rotation="0 0 0"
-      scale="0.05 0.05 0.05"
-      visible="false">
-    </a-gltf-model>
+    <!-- Сразу добавляем обе модели, чтобы не было глюков при переключении -->
+    <a-gltf-model id="model-gnome" src="#gnome-glb" position="0 0 0" scale="0.2 0.2 0.2" visible="false"></a-gltf-model>
+    <a-gltf-model id="model-keg" src="#keg-glb" position="0 0 0" scale="0.2 0.2 0.2" visible="false"></a-gltf-model>
   </a-entity>
 
-  <!-- СВЕТ -->
   <a-entity light="type: ambient; intensity: 0.7"></a-entity>
-  <a-entity light="type: directional; intensity: 0.8" position="0 1 0"></a-entity>
-
-  <!-- КАМЕРА -->
-  <a-camera mindar-image-camera></a-camera>
-
+  <a-entity light="type: directional; intensity: 0.8" position="1 2 1"></a-entity>
 </a-scene>
 
 <script>
-(() => {
-  const model = document.getElementById('model');
+// Оборачиваем в window.onload, чтобы скрипт точно увидел кнопки в HTML
+window.onload = () => {
+  const gnome = document.getElementById('model-gnome');
+  const keg = document.getElementById('model-keg');
   const marker = document.getElementById('marker');
   const sound = document.getElementById('ping');
+  const hint = document.getElementById('hint');
 
-  const models = ['#gnome', '#keg'];
-  let index = 0;
+  const btnSwitch = document.getElementById('btn-switch');
+  const btnPlus = document.getElementById('btn-plus');
+  const btnMinus = document.getElementById('btn-minus');
 
-  document.getElementById('btn-switch').onclick = () => {
-    index = (index + 1) % models.length;
-    model.setAttribute('src', models[index]);
+  let currentModel = gnome; 
+  let targetFound = false;
+
+  // Функция переключения
+  btnSwitch.onclick = () => {
+    console.log("Переключаю модель...");
+    currentModel.setAttribute('visible', false);
+    currentModel = (currentModel === gnome) ? keg : gnome;
+    
+    if (targetFound) {
+      currentModel.setAttribute('visible', true);
+    }
   };
 
-  document.getElementById('btn-plus').onclick = () => scale(1.2);
-  document.getElementById('btn-minus').onclick = () => scale(0.8);
+  // Масштабирование
+  const updateScale = (factor) => {
+    const s = currentModel.getAttribute('scale');
+    currentModel.setAttribute('scale', {
+      x: s.x * factor,
+      y: s.y * factor,
+      z: s.z * factor
+    });
+  };
 
-  function scale(f) {
-    const s = model.getAttribute('scale');
-    model.setAttribute('scale', `${s.x * f} ${s.y * f} ${s.z * f}`);
-  }
+  btnPlus.onclick = () => updateScale(1.2);
+  btnMinus.onclick = () => updateScale(0.8);
 
+  // События маркера
   marker.addEventListener('targetFound', () => {
-    model.setAttribute('visible', true);
+    targetFound = true;
+    currentModel.setAttribute('visible', true);
+    hint.style.display = 'none';
     sound.currentTime = 0;
-    sound.play().catch(()=>{});
+    sound.play().catch(() => {});
   });
 
   marker.addEventListener('targetLost', () => {
-    model.setAttribute('visible', false);
+    targetFound = false;
+    gnome.setAttribute('visible', false);
+    keg.setAttribute('visible', false);
+    hint.style.display = 'block';
   });
-})();
+};
 </script>
 
 </body>
